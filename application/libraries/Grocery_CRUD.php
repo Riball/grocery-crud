@@ -1224,6 +1224,18 @@ class grocery_CRUD_Model_Driver extends grocery_CRUD_Field_Types
 		return true;
 	}
 
+	protected function db_sort($field_name, $ids) {
+		foreach ($ids as $key => $id) {
+				$result = $this->basic_model->set_sort($field_name, $this->get_table(), $id, $key);
+
+				if(!$result) {
+					return false;
+				}
+		}
+
+		return true;
+	}
+
 	protected function db_relation_n_n_update($field_info, $post_data , $primary_key_value)
 	{
 		$this->basic_model->db_relation_n_n_update($field_info, $post_data , $primary_key_value);
@@ -1543,9 +1555,11 @@ class grocery_CRUD_Layout extends grocery_CRUD_Model_Driver
 		$data->ajax_list_info_url	= $this->getAjaxListInfoUrl();
 		$data->export_url			= $this->getExportToExcelUrl();
 		$data->print_url			= $this->getPrintUrl();
+		$data->sort_url				= $this->getSortUrl();
 		$data->actions				= $this->actions;
 		$data->unique_hash			= $this->get_method_hash();
 		$data->order_by				= $this->order_by;
+		$data->sortable				= $this->sortable;
 
 		$data->unset_add			= $this->unset_add;
 		$data->unset_edit			= $this->unset_edit;
@@ -1880,6 +1894,25 @@ class grocery_CRUD_Layout extends grocery_CRUD_Model_Driver
 
 			echo json_encode(array('success' => true , 'success_message' => $success_message));
 		}
+		$this->set_echo_and_die();
+	}
+
+	protected function sort_layout($sort_result = true)
+	{
+		@ob_end_clean();
+		if($sort_result === false)
+		{
+			$error_message = '<p>Sorting was not saved</p>';
+
+			echo json_encode(array('success' => $sort_result ,'error_message' => $error_message));
+		}
+		else
+		{
+			$success_message = '<p>Sorting was saved</p>';
+
+			echo json_encode(array('success' => true , 'success_message' => $success_message));
+		}
+
 		$this->set_echo_and_die();
 	}
 
@@ -2952,6 +2985,7 @@ class grocery_CRUD_States extends grocery_CRUD_Layout
 
     const STATE_READ = 18;
     const STATE_DELETE_MULTIPLE = '19';
+    const STATE_SORT = 20;
 
 	protected $states = array(
 		0	=> 'unknown',
@@ -2973,7 +3007,8 @@ class grocery_CRUD_States extends grocery_CRUD_Layout
 		16  => 'export',
 		17  => 'print',
 		18  => 'read',
-        19  => 'delete_multiple'
+    19  => 'delete_multiple',
+    20 	=> 'sort'
 	);
 
     public function getStateInfo()
@@ -3320,10 +3355,15 @@ class grocery_CRUD_States extends grocery_CRUD_Layout
         }
 	}
 
-    protected function getDeleteMultipleUrl()
-    {
-        return $this->state_url('delete_multiple');
-    }
+  protected function getDeleteMultipleUrl()
+  {
+      return $this->state_url('delete_multiple');
+  }
+
+  protected function getSortUrl()
+	{
+		return $this->state_url('sort');
+	}
 
 	protected function getListSuccessUrl($primary_key = null)
 	{
@@ -3428,6 +3468,7 @@ class Grocery_CRUD extends grocery_CRUD_States
 	protected $subject_plural 		= null;
 	protected $display_as 			= array();
 	protected $order_by 			= null;
+	protected $sortable				= false;
 	protected $where 				= array();
 	protected $like 				= array();
 	protected $having 				= array();
@@ -4276,6 +4317,17 @@ class Grocery_CRUD extends grocery_CRUD_States
 		return $this;
 	}
 
+	public function sortable()
+	{
+		$this->sortable = $key;
+
+		// Sort by order cause otherwise it doesn't make sense
+		// We sort descending cause when adding a record the order is empty or 0
+		$this->order_by($key, $direction = "desc");
+
+		return $this;
+	}
+
 	public function where($key, $value = NULL, $escape = TRUE)
 	{
 		$this->where[] = array($key,$value,$escape);
@@ -4661,7 +4713,7 @@ class Grocery_CRUD extends grocery_CRUD_States
 
     			break;
 
-            case grocery_CRUD_States::STATE_DELETE_MULTIPLE:
+      case grocery_CRUD_States::STATE_DELETE_MULTIPLE:
 
 				if($this->unset_delete)
                 {
@@ -4674,7 +4726,17 @@ class Grocery_CRUD extends grocery_CRUD_States
 
 				$this->delete_layout($delete_result);
 
-                break;
+          break;
+
+      case grocery_CRUD_States::STATE_SORT:
+      	if(!$this->sortable) {
+					throw new Exception('You don\'t have permissions for this operation', 14);
+					die();
+				}
+
+				$sort_result = $this->db_sort($this->sortable, $_POST['ids']);
+				$this->sort_layout( $sort_result );
+      	break;
 
 		}
 

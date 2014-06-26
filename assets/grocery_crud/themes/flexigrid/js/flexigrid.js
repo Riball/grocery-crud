@@ -1,4 +1,66 @@
 $(function(){
+
+	var sortable = false;
+	if($('table').find('.sortable').length > 0) {
+			sortable = true;
+
+			// Cleanup
+			$('.field-sorting').removeClass('desc').removeClass('field-sorting');
+	}
+
+	// Init ui sortable
+	$('tbody.sortable').sortable({
+		containment: "parent",
+		cursor: "grab",
+		axis: "y",
+		helper: function(e, tr)
+	  {
+	    var $originals = tr.children();
+	    var $helper = tr.clone();
+	    $helper.children().each(function(index)
+	    {
+	      // Set helper cell sizes to match the original sizes
+	      $(this).width($originals.eq(index).outerWidth());
+	    });
+	    return $helper;
+	  },
+		start: function(e, ui ){
+    	ui.placeholder.height(ui.helper.outerHeight());
+		},
+		update: function() {
+			var ids = [],
+					rows = $(this).find('tr'),
+					url = $(this).data('url');
+
+			rows.removeClass('erow');
+			rows.each(function(index) {
+				if(index % 2 != 0) {
+					$(this).addClass('erow');
+				}
+				ids.unshift($(this).data('id'));
+
+				// Can improve this a little
+				$(this).find('.sorted .text-left').html(rows.length - 1 - index);
+			});
+
+			$.ajax({
+				url: url,
+				type: "post",
+				data: {ids: ids},
+				dataType: "json"
+			}).done(function(data) {
+				if(data.success) {
+					success_message(data.success_message);
+				} else {
+					error_message(data.error_message);
+				}
+			}).fail(function(data) {
+				error_message('Something went wrong.');
+			});
+		}
+	}).disableSelection();
+
+
 	$('.quickSearchButton').click(function(){
 		$(this).closest('.flexigrid').find('.quickSearchBox').slideToggle('normal');
 	});
@@ -127,6 +189,12 @@ $(function(){
 	});
 
 	$('.ajax_list').on('click','.field-sorting', function(){
+
+		// Field sorting would ruin the sortable drag drop option
+		if(sortable) {
+			return;
+		}
+
 		$(this).closest('.flexigrid').find('.hidden-sorting').val($(this).attr('rel'));
 
 		if ($(this).hasClass('asc')) {

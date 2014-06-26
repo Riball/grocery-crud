@@ -503,6 +503,13 @@ class grocery_CRUD_Model  extends CI_Model  {
     		return true;
     }
 
+    function set_sort($field_name, $table_name, $id, $value) {
+        $primary_key = $this->get_primary_key($table_name);
+
+        $this->db->where($primary_key, $id);
+        return $this->db->update($table_name, array($field_name => $value));
+    }
+
     function db_file_delete($field_name, $filename)
     {
     	if( $this->db->update($this->table_name,array($field_name => ''),array($field_name => $filename)) )
